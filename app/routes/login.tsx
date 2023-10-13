@@ -1,71 +1,81 @@
-import { ActionFunction, json, LoaderFunction, redirect } from "@remix-run/node"
-import { useState, useEffect, useRef } from "react"
-import { Layout } from "~/components/layout"
-import { FormField } from "~/components/form-field"
+// login.tsx
+import { useState, useEffect, useRef } from 'react'
+import type { ActionFunction, LoaderFunction } from '@remix-run/node'
+import { json, redirect } from '@remix-run/node'
+import { useActionData } from '@remix-run/react'
+
+import { Layout } from '~/components/layout'
+import { FormField } from '~/components/form-field'
 import { validateEmail, validateName, validatePassword } from '~/utils/validators.server'
 import { login, register, getUser } from '~/utils/auth.server'
-import { useActionData } from "@remix-run/react"
 
 export const loader: LoaderFunction = async ({ request }) => {
-  // If there's already a user in the session, redirect to the home page
-  return (await getUser(request)) ? redirect('/') : null
+    // If there's already a user in the session, redirect to the home page
+    return await getUser(request) ? redirect('/') : null
 }
 
 export const action: ActionFunction = async ({ request }) => {
-  const form = await request.formData()
-  const action = form.get('_action')
-  const email = form.get('email')
-  const password = form.get('password')
-  let firstName = form.get('firstName')
-  let lastName = form.get('lastName')
+    const form = await request.formData();
+    const action = form.get("_action");
+    const email = form.get("email");
+    const password = form.get("password");
+    let firstName = form.get("firstName");
+    let lastName = form.get("lastName");
 
-
-  if (typeof action !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
-    return json({ error: `Invalid Form Data`, form: action }, { status: 400 })
-  }
-
-  if (action === 'register' && (typeof firstName !== 'string' || typeof lastName !== 'string')) {
-    return json({ error: `Invalid Form Data`, form: action }, { status: 400 })
-  }
-
-  const errors = {
-    email: validateEmail(email),
-    password: validatePassword(password),
-    ...(action === 'register'
-      ? {
-        firstName: validateName((firstName as string) || ''),
-        lastName: validateName((lastName as string) || ''),
-      }
-      : {}),
-  }
-
-  if (Object.values(errors).some(Boolean))
-    return json({ errors, fields: { email, password, firstName, lastName }, form: action }, { status: 400 })
-
-  switch (action) {
-    case 'login': {
-      return await login({ email, password })
+    // If not all data was passed, error
+    if (
+        typeof action !== "string" ||
+        typeof email !== "string" ||
+        typeof password !== "string"
+    ) {
+        return json({ error: `Invalid Form Data`, form: action }, { status: 400 });
     }
-    case 'register': {
-      firstName = firstName as string
-      lastName = lastName as string
-      return await register({ email, password, firstName, lastName })
-    }
-    default:
-      return json({ error: `Invalid Form Data` }, { status: 400 });
-  }
 
+    // If not all data was passed, error
+    if (
+        action === 'register' && (
+            typeof firstName !== "string" ||
+            typeof lastName !== "string"
+        )
+    ) {
+        return json({ error: `Invalid Form Data`, form: action }, { status: 400 });
+    }
+
+    // Validate email & password
+    const errors = {
+        email: validateEmail(email),
+        password: validatePassword(password),
+        ...(action === 'register' ? {
+            firstName: validateName(firstName as string || ''),
+            lastName: validateName(lastName as string || ''),
+        } : {})
+    };
+
+    //  If there were any errors, return them
+    if (Object.values(errors).some(Boolean))
+        return json({ errors, fields: { email, password, firstName, lastName }, form: action }, { status: 400 });
+
+    switch (action) {
+        case 'login': {
+            return await login({ email, password })
+        }
+        case 'register': {
+            firstName = firstName as string
+            lastName = lastName as string
+            return await register({ email, password, firstName, lastName })
+        }
+        default:
+            return json({ error: `Invalid Form Data` }, { status: 400 });
+    }
 }
 
 export default function Login() {
 
-  const [action, setAction] = useState('login')
-
   const actionData = useActionData();
   const firstLoad = useRef(true);
+  const [action, setAction] = useState('login')
   const [errors, setErrors] = useState(actionData?.errors || {});
   const [formError, setFormError] = useState(actionData?.error || '');
-
   const [formData, setFormData] = useState({
     email: actionData?.fields?.email || '',
     password: actionData?.fields?.password || '',
@@ -73,31 +83,36 @@ export default function Login() {
     lastName: actionData?.fields?.firstName || '',
   })
 
+  https://github.com/sabinadams/kudos-remix-mongodb-prisma/blob/part-2/app/routes/login.tsx
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>, field: string) => {
     setFormData(form => ({ ...form, [field]: event.target.value }))
   }
 
   useEffect(() => {
+    // Clear the form if we switch forms
     if (!firstLoad.current) {
-      const newState = {
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-      }
-      setErrors({})
-      setFormError('')
-      setFormData(newState)
+        const newState = {
+            email: '',
+            password: '',
+            firstName: '',
+            lastName: ''
+        }
+        setErrors(newState)
+        setFormError('')
+        setFormData(newState)
     }
-  }, [action])
+}, [action])
 
-  useEffect(() => {
+useEffect(() => {
     if (!firstLoad.current) {
-      setFormError('')
+        setFormError('')
     }
-  }, [formData])
+}, [formData])
 
-  useEffect(() => { firstLoad.current = false }, [])
+useEffect(() => {
+    // We don't want to reset errors on page load because we want to see them
+    firstLoad.current = false
+}, [])
 
 
   return (
